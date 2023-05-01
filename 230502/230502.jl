@@ -29,7 +29,7 @@ function cleansurveys!(dfs)
                               # Translating ethanwhite's cleaning script involves an anonymous function, verbose in Julia ... 
                               # [:year, :month] => ((y, m) -> Date.(string.(y, "-", m, "-", "01"), dateformat"y-m-d")) => :iso_date,
                               # better do
-                              :year => Date -> :iso_date,
+                              :year => (y -> Date.(y)) => :iso_date,
                           )
 end
 
