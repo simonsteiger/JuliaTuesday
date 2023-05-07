@@ -11,18 +11,18 @@ names = ["plots", "species", "surveys"]
 sfx = ".csv"
 
 # Download data
-[Downloads.download(string(remotedir, n, sfx), string(n, sfx)) for n in names]
+[Downloads.download(string(remotedir, n, sfx), string(localdir, n, sfx)) for n in names]
 
 # Initialise dictionary
-dfs = Dict{Symbol,DataFrame}()
+dfs = Dict{String, DataFrame}()
 
 # Read files into dictionary
-[dfs[Symbol(n)] = CSV.read(string(n, sfx), DataFrame) for n in names]
+[dfs[n] = CSV.read(string(localdir, n, sfx), DataFrame) for n in names]
 
 # Spin-off of ethanwhite's cleaning script
 # Bottom of page https://github.com/rfordatascience/tidytuesday/tree/master/data/2023/2023-05-02
 function cleansurveys!(dfs)
-    dfs[:surveys] = @pipe dfs[:surveys] |>
+    dfs["surveys"] = @pipe dfs["surveys"] |>
                           filter(
                               :censusdate => x -> x > Date(1978, 01, 01) && !ismissing(x), _) |>
                           transform(
@@ -39,7 +39,7 @@ end
 
 cleansurveys!(dfs)
 
-sex_by_year = @pipe dfs[:surveys] |>
+sex_by_year = @pipe dfs["surveys"] |>
                     filter(:sex => x -> !ismissing(x), _) |>
                     groupby(_, [:year, :sex]) |>
                     combine(_, nrow => :groupsize)
