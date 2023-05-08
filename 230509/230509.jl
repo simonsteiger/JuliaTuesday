@@ -21,9 +21,18 @@ dfs = Dict{String,DataFrame}()
 # Read files into dictionary
 [dfs[n] = CSV.read(string(localdir, n, sfx), DataFrame) for n in [names..., "us_elections"]]
 
-# we could get 2016 data and see if our childcare values predict election results
+# Join counties and childcare_costs
+data_cc = @pipe dfs["childcare_costs"] |>
+                subset(_, :study_year => x -> x .== 2018) |>
+                innerjoin(_, dfs["counties"], on=:county_fips_code) |>
+                transform(_, :county_name => ByRow(x -> replace(x, r"\s+County$" => "")) => :county_name)
 
-x = @pipe dfs["us_elections"] |>
-          subset(_, :party => ByRow(x -> passmissing(occursin)(r"REP|DEM", x)), skipmissing=true) |>
-          groupby(_, [:state, :party]) |>
-          combine(_, :votes => sum => :sum_votes)
+
+
+
+data_ccele = @pipe dfs["us_elections"] |>
+                   subset(_, :party => ByRow(x -> passmissing(occursin)(r"REP|DEM", x)), skipmissing=true) |>
+                   subset(_, :county => ByRow(x -> !ismissing(x))) |>
+                   groupby(_, [:county, :party]) |>
+                   combine(_, :votes => sum => :sum_votes) |>
+                   innerjoin(_, data_cc, on=:county => :county_name)
