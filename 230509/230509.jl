@@ -1,6 +1,6 @@
 using CSV, Downloads # Loading 
 using DataFrames, Pipe # Wrangling
-using MultivariateStats # PCA
+using MultivariateStats, StatsBase # PCA
 
 remotedir = "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-05-09/"
 localdir = "230509/"
@@ -57,7 +57,8 @@ Xte = convert.(Float64, Xte)
 
 Xte_labels = Vector(data_ccele[2:2:end, 2])
 
-M = fit(PCA, Xtr, maxoutdim=3)
+Z = fit(ZScoreTransform, Xtr)
 
-# This fit is totally goverend by the variables with the largest variance
-# Need to scale!
+StatsBase.transform!(Z, Xtr)
+
+M = fit(PCA, Xtr, maxoutdim=5)
