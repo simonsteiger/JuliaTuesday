@@ -1,6 +1,8 @@
 using CSV, Downloads # Loading 
-using DataFrames, Pipe # Wrangling
-using MultivariateStats, StatsBase # PCA
+using DataFrames, DataFramesMeta
+import MultivariateStats as MS
+import StatsBase as SB
+using StatsPlots, Plots
 
 remotedir = "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-05-09/"
 localdir = "230509/"
@@ -24,41 +26,52 @@ dfs = Dict{String,DataFrame}()
 dfs["us_elections"] = CSV.read(string(localdir, "us_elections", sfx), DataFrame)
 
 # Join counties and childcare_costs
-data_cc = @pipe dfs["childcare_costs"] |>
-                subset(_, :study_year => x -> x .== 2018) |>
-                subset(_, All() .=> ByRow(x -> !ismissing(x))) |>
-                innerjoin(_, dfs["counties"], on=:county_fips_code) |>
-                transform(_, :county_name => ByRow(x -> replace(x, r"\s+County$" => "")) => :county_name)
+data_cc = @chain dfs["childcare_costs"] begin
+                subset(:study_year => x -> x .== 2018)
+                subset(All() .=> ByRow(x -> !ismissing(x)))
+                innerjoin(_, dfs["counties"], on=:county_fips_code)
+                transform(:county_name => ByRow(x -> replace(x, r"\s+County$" => "")) => :county_name)
+end
 
 # Join childcare_counties with election results
-data_ccele = @pipe dfs["us_elections"] |>
-                   subset(_, :party => ByRow(x -> passmissing(occursin)(r"REP|DEM", x)), skipmissing=true) |>
-                   subset(_, :county => ByRow(x -> !ismissing(x))) |>
-                   groupby(_, [:county, :party]) |>
-                   combine(_, :votes => sum => :sum_votes) |>
-                   unstack(_, :party, :sum_votes) |>
-                   transform(_, [:DEM, :REP] => ByRow((x, y) -> x / (x + y)) => :ratio_DEM) |>
-                   innerjoin(_, data_cc, on=:county => :county_name) |>
-                   select(_, Not([:DEM, :REP, :county_fips_code, :study_year, :state_name, :state_abbreviation]))
+data_ccele = @chain dfs["us_elections"] begin
+                   subset(:party => ByRow(x -> passmissing(occursin)(r"REP|DEM", x)), skipmissing=true)
+                   subset(:county => ByRow(x -> !ismissing(x)))
+                   groupby(_, [:county, :party])
+                   combine(:votes => sum => :sum_votes)
+                   unstack(_, :party, :sum_votes)
+                   groupby(_, :county)
+                   combine([:DEM, :REP] => ByRow((x, y) -> x > y ? "DEM" : "REP") => :winner)
+                   innerjoin(_, data_cc, on=:county => :county_name)
+                   select(:state_name, Not([:county_fips_code, :study_year, :state_abbreviation]))
+end
 
 # Training
-Xtr = Matrix(data_ccele[1:2:end, 3:61])'
+Xtr = @chain Matrix(data_ccele[1:2:end, 4:62])' begin
+            convert.(Float64, _) # Must be of type Float64
+end
 
-# Must be of type Float64
-Xtr = convert.(Float64, Xtr)
-
-Xtr_labels = Vector(data_ccele[1:2:end, 2])
+Xtr_labels = Vector(data_ccele[1:2:end, 3])
 
 # Testing
-Xte = Matrix(data_ccele[2:2:end, 3:61])'
+Xte = @chain Matrix(data_ccele[2:2:end, 4:62])' begin
+            convert.(Float64, _) # Must be of type Float64
+end
 
-# Must be of type Float64
-Xte = convert.(Float64, Xte)
+Xte_labels = Vector(data_ccele[2:2:end, 3])
 
-Xte_labels = Vector(data_ccele[2:2:end, 2])
+Z = MS.fit(SB.ZScoreTransform, Xtr)
+SB.transform!(Z, Xtr)
+SB.transform!(Z, Xte)
+M = MS.fit(MS.PCA, Xtr, maxoutdim=8)
 
-Z = fit(ZScoreTransform, Xtr)
+Yte = MS.predict(M, Xte)
 
-StatsBase.transform!(Z, Xtr)
+Xr = MS.reconstruct(M, Yte)
 
-M = fit(PCA, Xtr, maxoutdim=5)
+DEM = Yte[:,Xte_labels.=="DEM"]
+REP = Yte[:,Xte_labels.=="REP"]
+
+p = scatter(REP[1,:],REP[2,:],REP[3,:],marker=:circle, markeralpha=0.35, linewidth=0, label="REP")
+scatter!(DEM[1,:],DEM[2,:],DEM[3,:],marker=:circle, markeralpha=0.35, linewidth=0, label="DEM")
+plot!(p,xlabel="PC1",ylabel="PC2", zlabel="PC3")
