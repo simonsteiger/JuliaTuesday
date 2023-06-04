@@ -46,32 +46,34 @@ data_ccele = @chain dfs["us_elections"] begin
                    select(:state_name, Not([:county_fips_code, :study_year, :state_abbreviation]))
 end
 
-# Training
+# Training set
 Xtr = @chain Matrix(data_ccele[1:2:end, 4:62])' begin
             convert.(Float64, _) # Must be of type Float64
 end
 
 Xtr_labels = Vector(data_ccele[1:2:end, 3])
 
-# Testing
+# Testing set
 Xte = @chain Matrix(data_ccele[2:2:end, 4:62])' begin
             convert.(Float64, _) # Must be of type Float64
 end
 
 Xte_labels = Vector(data_ccele[2:2:end, 3])
 
+# Z transform and fit PCA
 Z = MS.fit(SB.ZScoreTransform, Xtr)
 SB.transform!(Z, Xtr)
 SB.transform!(Z, Xte)
 M = MS.fit(MS.PCA, Xtr, maxoutdim=8)
 
+# Check results
 Yte = MS.predict(M, Xte)
-
 Xr = MS.reconstruct(M, Yte)
 
+# Extract values for plotting
 DEM = Yte[:,Xte_labels.=="DEM"]
 REP = Yte[:,Xte_labels.=="REP"]
 
 p = scatter(REP[1,:],REP[2,:],REP[3,:],marker=:circle, markeralpha=0.35, linewidth=0, label="REP")
 scatter!(DEM[1,:],DEM[2,:],DEM[3,:],marker=:circle, markeralpha=0.35, linewidth=0, label="DEM")
-plot!(p,xlabel="PC1",ylabel="PC2", zlabel="PC3")
+plot!(p,xlabel="PC1",ylabel="PC2", zlabel="PC3",camera=[30,30]) # rotate with argument camera=[x::Int64,y::Int64]
