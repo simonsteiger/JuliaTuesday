@@ -28,9 +28,7 @@ unique(df."Unique Squirrel ID")
 # -> no multilevel model
 
 # We don't want those that have missing Primary Fur Color
-df = @chain df begin
-    subset(_, "Primary Fur Color" => ByRow(x -> !ismissing(x)))
-end
+subset!(df, "Primary Fur Color" => ByRow(x -> !ismissing(x)))
 
 # We were low on black and cinnamon fur
 # Class imbalance may be an issue, so let's upsample
@@ -67,7 +65,7 @@ end
 up = Dict()
 
 # Upsample the two minority categories
-for col in ["Black", "Cinammon"]
+for col in ["Black", "Cinnamon"]
     up[col] = let
         df_sub = @chain df begin
             subset(_, "Primary Fur Color" => ByRow(x -> x == col))
