@@ -62,7 +62,7 @@ df = @chain df begin
 end
 
 # A dict to save results for each category in
-up = Dict()
+up = Dict{String, DataFrame}()
 
 # Upsample the two minority categories
 for col in ["Black", "Cinnamon"]

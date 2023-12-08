@@ -77,3 +77,29 @@ REP = Yte[:,Xte_labels.=="REP"]
 p = scatter(REP[1,:],REP[2,:],REP[3,:],marker=:circle, markeralpha=0.35, linewidth=0, label="REP")
 scatter!(DEM[1,:],DEM[2,:],DEM[3,:],marker=:circle, markeralpha=0.35, linewidth=0, label="DEM")
 plot!(p,xlabel="PC1",ylabel="PC2", zlabel="PC3",camera=[30,30]) # rotate with argument camera=[x::Int64,y::Int64]
+
+# For the model, we want to fit the PCA to the entire data set
+
+M = MS.fit(MS.PCA, [Xtr Xte], maxoutdim=8)
+
+function standardise(v)
+    x̄ = SB.mean(v)
+    σ = SB.std(v)
+    [(x̄ - x) / σ for x in v] 
+end
+
+Yfull = MS.predict(M, [Xtr Xte])
+
+Yz = [standardise(r) for r in eachslice(Yfull, dims=1)]
+
+using Turing
+
+function logistic_elections(x, y)
+    PC1, PC2, PC3, PC4, PC5, PC6, PC7, PC8 = fill(Normal(), 8)
+
+    n, _ = size(x)
+
+    for i in 1:n
+        # model
+    end
+end
